@@ -1,3 +1,3 @@
 #!/bin/sh
 
-idris -p lightyear IdrisFmt.idr
+idris -p lightyear -p contrib IdrisFMT.idr

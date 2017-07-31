@@ -1,0 +1,7 @@
+package idrisfmt
+
+modules = IdrisFMT
+executable = yourExecutable
+main = Main
+
+pkgs = lightyear, contrib
