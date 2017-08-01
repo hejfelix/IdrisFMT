@@ -7,6 +7,8 @@ import Lightyear.Char
 
 import Data.SortedMap
 
+import Effect.File
+
 data Token =
   Import
   | Module
@@ -22,6 +24,9 @@ data Token =
   | RightArrow
   | BigRightArrow
   | Pipe
+  | Equality
+  | LeftParen
+  | RightParen
   | StringLiteral String
 
 Show Token where
@@ -39,6 +44,9 @@ Show Token where
   show Spaces             = "(space)"
   show Newline            = "(newline)"
   show Pipe               = "|"
+  show Equality           = "="
+  show LeftParen          = "("
+  show RightParen         = ")"
   show (StringLiteral s)  = "\"" ++ s ++ "\""
 
 
@@ -55,7 +63,10 @@ keyWordMap = fromList
     (",", Comma),
     (":", Colon),
     ("$", Dollar),
-    ("|", Pipe)
+    ("|", Pipe),
+    ("=", Equality),
+    ("(", LeftParen),
+    (")", RightParen)
   ]
 
 emptyParser : ParserT String Identity String
@@ -108,3 +119,12 @@ tokenParser = many (
   spacesToken       <|>
   newlineToken      <|>
   stringLiteralToken)
+
+printFile : Either FileError String -> IO ()
+printFile (Left l) = printLn (show l)
+printFile (Right r) = printLn (parse tokenParser r)
+
+main : IO ()
+main = do
+  maybeFileHandle <- readFile "IdrisFMT.idr"
+  printFile maybeFileHandle
