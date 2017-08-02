@@ -7,8 +7,6 @@ import Lightyear.Char
 
 import Data.SortedMap
 
-import Effect.File
-
 data Token =
   Import
   | Module
@@ -28,6 +26,8 @@ data Token =
   | LeftParen
   | RightParen
   | StringLiteral String
+  | CharLiteral String
+  | ListLiteral (List Token)
 
 Show Token where
   show Module             = "module"
@@ -48,6 +48,28 @@ Show Token where
   show LeftParen          = "("
   show RightParen         = ")"
   show (StringLiteral s)  = "\"" ++ s ++ "\""
+  show (CharLiteral s)    = "'" ++ s ++ "'"
+  show (ListLiteral xs)   = show xs
+
+dontEscape : Parser String
+dontEscape = do
+  notSlash <- satisfy (/= '\\')
+  next <- anyToken
+  pure $ pack $ (the $ List Char) [notSlash,next]
+
+quoteInside : Parser String
+quoteInside = do
+  char '\\'
+  char '"'
+  pure "\""
+
+stringLiteralToken : Parser Token
+stringLiteralToken = do
+  char '"'
+  x <- many (map singleton (noneOf "\"") <|> quoteInside)
+  char '"'
+  pure $ StringLiteral $ foldl (++) "" x
+
 
 
 keyWordMap : SortedMap String Token
@@ -82,28 +104,51 @@ keyWordToken = do
         Nothing => StringLiteral $ "no token for keyword: " ++ keyWordString
         (Just x) => x)
 
-importToken : Parser Token
-importToken = do
-  token <- string "import"
-  pure $ Import
+-- identifierToken : Parser Token
+-- identifierToken = do
+--   token <- some ( satisfy isAlpha )
+--   pure $ Identifier $ pack token
 
-whereToken : Parser Token
-whereToken = do
-  token <- string "where"
-  pure $ Import
+identifierSymbols : List Char
+identifierSymbols = [
+ '!',
+ '#',
+ '$',
+ '%',
+ '&',
+ '*',
+ '+',
+ '.',
+ '/',
+ '<',
+ '=',
+ '>',
+ '?',
+ '@',
+ '\\',
+ '^',
+ ',',
+ '-',
+ '~'
+ ]
 
-moduleToken : Parser Token
-moduleToken = do
-  token <- string "module"
-  pure $ Module
+
 
 identifierToken : Parser Token
 identifierToken = do
-  token <- some ( satisfy isAlpha )
-  pure $ Identifier $ pack token
+  first <- satisfy (\c => isAlpha c || hasAny [c] identifierSymbols)
+  rest  <- many (satisfy (\c => isAlpha c || isDigit c || hasAny [c] identifierSymbols))
+  pure $ Identifier $ (pack $ first :: rest)
 
-stringLiteralToken : Parser Token
-stringLiteralToken = map StringLiteral $ quoted '"'
+charLiteralToken : Parser Token
+charLiteralToken = map CharLiteral $ quoted '\''
+
+anyLiteral : Parser Token
+anyLiteral = stringLiteralToken <|> charLiteralToken
+
+listLiteralToken : Parser Token
+listLiteralToken = brackets $ map ListLiteral $ commaSep (anyLiteral <|> identifierToken)
+
 
 spacesToken : Parser Token
 spacesToken = map (\_ => Spaces) (some space)
@@ -118,7 +163,8 @@ tokenParser = many (
   identifierToken   <|>
   spacesToken       <|>
   newlineToken      <|>
-  stringLiteralToken)
+  anyLiteral        <|>
+  listLiteralToken )
 
 printFile : Either FileError String -> IO ()
 printFile (Left l) = printLn (show l)
