@@ -16,7 +16,7 @@ data Token =
   | Colon
   | Comma
   | Dollar
-  | Spaces
+  | WhiteSpace Char
   | Newline
   | LeftArrow
   | RightArrow
@@ -31,7 +31,31 @@ data Token =
   | TupleLiteral (List Token)
   | IntegerLiteral String
 
-Show Token where
+
+[pretty] Show Token where
+  show Module             = "module"
+  show Import             = "import"
+  show Where              = "where"
+  show (Identifier x)     = x
+  show Dollar             = "$"
+  show Comma              = ","
+  show Period             = "."
+  show Colon              = ":"
+  show LeftArrow          = "<-"
+  show RightArrow         = "->"
+  show BigRightArrow      = "=>"
+  show (WhiteSpace c)     = the String $ cast c
+  show Pipe               = "|"
+  show Equality           = "="
+  show LeftParen          = "("
+  show RightParen         = ")"
+  show (StringLiteral s)  = "\"" ++ s ++ "\""
+  show (CharLiteral s)    = "'" ++ s ++ "'"
+  show (ListLiteral xs)   = show xs
+  show (TupleLiteral xs)  = show "(" ++ show xs ++ ")"
+  show (IntegerLiteral i) = show i
+
+[default] Show Token where
   show Module             = "module"
   show Import             = "import"
   show Where              = "where"
@@ -43,7 +67,7 @@ Show Token where
   show LeftArrow          = "<-"
   show RightArrow         = "->"
   show BigRightArrow      = "=>"
-  show Spaces             = "(space)"
+  show (WhiteSpace c)     = show c
   show Newline            = "(newline)"
   show Pipe               = "|"
   show Equality           = "="
@@ -155,26 +179,24 @@ mutual
   listLiteralToken : Parser Token
   listLiteralToken = brackets $ map ListLiteral $ commaSep anyLiteral
 
-spacesToken : Parser Token
-spacesToken = map (\_ => Spaces) (some space)
-
-newlineToken : Parser Token
-newlineToken = map (\_ => Newline) newline
-
+whiteSpaceToken : Parser Token
+whiteSpaceToken = map WhiteSpace space
 
 tokenParser : Parser (List Token)
 tokenParser = many (
   keyWordToken      <|>
   identifierToken   <|>
-  spacesToken       <|>
-  newlineToken      <|>
+  whiteSpaceToken   <|>
   anyLiteral         )
 
-printFile : Either FileError String -> IO ()
+tokensToString : (Show Token) => List Token -> String
+tokensToString xs = concat $ map show xs
+
+printFile : Show Token => Either FileError String -> IO ()
 printFile (Left l) = printLn (show l)
-printFile (Right r) = printLn (parse tokenParser r)
+printFile (Right r) = printLn $ map tokensToString (parse tokenParser r)
 
 main : IO ()
 main = do
   maybeFileHandle <- readFile "IdrisFMT.idr"
-  printFile maybeFileHandle
+  printFile @{pretty} maybeFileHandle
