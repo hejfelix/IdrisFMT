@@ -28,6 +28,7 @@ data Token =
   | StringLiteral String
   | CharLiteral String
   | ListLiteral (List Token)
+  | TupleLiteral (List Token)
 
 Show Token where
   show Module             = "module"
@@ -50,6 +51,7 @@ Show Token where
   show (StringLiteral s)  = "\"" ++ s ++ "\""
   show (CharLiteral s)    = "'" ++ s ++ "'"
   show (ListLiteral xs)   = show xs
+  show (TupleLiteral xs)  = show "(" ++ show xs ++ ")"
 
 escape : Parser String
 escape = do
@@ -65,6 +67,9 @@ character = nonEscape <|> escape
 
 stringLiteralToken : Parser Token
 stringLiteralToken = map (StringLiteral . concat) $ dquote (many character)
+
+charLiteralToken : Parser Token
+charLiteralToken = map CharLiteral $ squote character
 
 keyWordMap : SortedMap String Token
 keyWordMap = fromList
@@ -123,6 +128,7 @@ identifierSymbols = [
  '^',
  ',',
  '-',
+ '_',
  '~'
  ]
 
@@ -134,14 +140,22 @@ identifierToken = do
   rest  <- many (satisfy (\c => isAlpha c || isDigit c || hasAny [c] identifierSymbols))
   pure $ Identifier $ (pack $ first :: rest)
 
-charLiteralToken : Parser Token
-charLiteralToken = map CharLiteral $ quoted '\''
 
-anyLiteral : Parser Token
-anyLiteral = stringLiteralToken <|> charLiteralToken
 
-listLiteralToken : Parser Token
-listLiteralToken = brackets $ map ListLiteral $ commaSep (anyLiteral <|> identifierToken)
+mutual
+  anyLiteral : Parser Token
+  anyLiteral = stringLiteralToken
+    <|> charLiteralToken
+    <|> identifierToken
+    <|>| listLiteralToken
+    <|>| tupleLiteral
+
+  tupleLiteral : Parser Token
+  tupleLiteral = parens $ map TupleLiteral $ commaSep anyLiteral
+
+  listLiteralToken : Parser Token
+  listLiteralToken = brackets $ map ListLiteral $ commaSep anyLiteral
+
 
 
 spacesToken : Parser Token
@@ -157,8 +171,7 @@ tokenParser = many (
   identifierToken   <|>
   spacesToken       <|>
   newlineToken      <|>
-  anyLiteral        <|>
-  listLiteralToken )
+  anyLiteral         )
 
 printFile : Either FileError String -> IO ()
 printFile (Left l) = printLn (show l)
