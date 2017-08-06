@@ -51,26 +51,20 @@ Show Token where
   show (CharLiteral s)    = "'" ++ s ++ "'"
   show (ListLiteral xs)   = show xs
 
-dontEscape : Parser String
-dontEscape = do
-  notSlash <- satisfy (/= '\\')
-  next <- anyToken
-  pure $ pack $ (the $ List Char) [notSlash,next]
+escape : Parser String
+escape = do
+  d <- char '\\'
+  c <- oneOf "\\\"0nrvtbf"
+  pure $ pack $ (the $ List Char) [d,c]
 
-quoteInside : Parser String
-quoteInside = do
-  char '\\'
-  char '"'
-  pure "\""
+nonEscape : Parser String
+nonEscape = map show $ noneOf "\\\"\0\n\r\v\t\b\f"
+
+character : Parser String
+character = nonEscape <|> escape
 
 stringLiteralToken : Parser Token
-stringLiteralToken = do
-  char '"'
-  x <- many (map singleton (noneOf "\"") <|> quoteInside)
-  char '"'
-  pure $ StringLiteral $ foldl (++) "" x
-
-
+stringLiteralToken = map (StringLiteral . concat) $ dquote (many character)
 
 keyWordMap : SortedMap String Token
 keyWordMap = fromList
