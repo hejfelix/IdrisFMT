@@ -29,6 +29,7 @@ data Token =
   | CharLiteral String
   | ListLiteral (List Token)
   | TupleLiteral (List Token)
+  | IntegerLiteral String
 
 Show Token where
   show Module             = "module"
@@ -52,6 +53,7 @@ Show Token where
   show (CharLiteral s)    = "'" ++ s ++ "'"
   show (ListLiteral xs)   = show xs
   show (TupleLiteral xs)  = show "(" ++ show xs ++ ")"
+  show (IntegerLiteral i) = show i
 
 escape : Parser String
 escape = do
@@ -70,6 +72,9 @@ stringLiteralToken = map (StringLiteral . concat) $ dquote (many character)
 
 charLiteralToken : Parser Token
 charLiteralToken = map CharLiteral $ squote character
+
+intLiteralToken : Parser Token
+intLiteralToken = map (IntegerLiteral . show) integer
 
 keyWordMap : SortedMap String Token
 keyWordMap = fromList
@@ -103,11 +108,6 @@ keyWordToken = do
         Nothing => StringLiteral $ "no token for keyword: " ++ keyWordString
         (Just x) => x)
 
--- identifierToken : Parser Token
--- identifierToken = do
---   token <- some ( satisfy isAlpha )
---   pure $ Identifier $ pack token
-
 identifierSymbols : List Char
 identifierSymbols = [
  '!',
@@ -140,13 +140,12 @@ identifierToken = do
   rest  <- many (satisfy (\c => isAlpha c || isDigit c || hasAny [c] identifierSymbols))
   pure $ Identifier $ (pack $ first :: rest)
 
-
-
 mutual
   anyLiteral : Parser Token
   anyLiteral = stringLiteralToken
     <|> charLiteralToken
     <|> identifierToken
+    <|> intLiteralToken
     <|>| listLiteralToken
     <|>| tupleLiteral
 
@@ -155,8 +154,6 @@ mutual
 
   listLiteralToken : Parser Token
   listLiteralToken = brackets $ map ListLiteral $ commaSep anyLiteral
-
-
 
 spacesToken : Parser Token
 spacesToken = map (\_ => Spaces) (some space)
