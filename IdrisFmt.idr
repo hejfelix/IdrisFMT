@@ -29,7 +29,7 @@ data Token =
   | CharLiteral String
   | ListLiteral (List Token)
   | TupleLiteral (List Token)
-  | IntegerLiteral String
+  | IntegerLiteral Integer
 
 
 [pretty] Show Token where
@@ -73,7 +73,7 @@ data Token =
   show Equality           = "="
   show LeftParen          = "("
   show RightParen         = ")"
-  show (StringLiteral s)  = "\"" ++ s ++ "\""
+  show (StringLiteral s)  = "StringLiteral(\"" ++ s ++ "\")"
   show (CharLiteral s)    = "'" ++ s ++ "'"
   show (ListLiteral xs)   = show xs
   show (TupleLiteral xs)  = show "(" ++ show xs ++ ")"
@@ -86,10 +86,10 @@ escape = do
   pure $ pack $ (the $ List Char) [d,c]
 
 nonEscape : Parser String
-nonEscape = map show $ noneOf "\\\"\0\n\r\v\t\b\f"
+nonEscape = map (\x => pack $ (the $ List _) [x]) $ noneOf "\\\"\0\n\r\v\t\b\f"
 
 character : Parser String
-character = nonEscape <|> escape
+character = nonEscape <|>| escape
 
 stringLiteralToken : Parser Token
 stringLiteralToken = map (StringLiteral . concat) $ dquote (many character)
@@ -98,7 +98,7 @@ charLiteralToken : Parser Token
 charLiteralToken = map CharLiteral $ squote character
 
 intLiteralToken : Parser Token
-intLiteralToken = map (IntegerLiteral . show) integer
+intLiteralToken = map IntegerLiteral integer
 
 keyWordMap : SortedMap String Token
 keyWordMap = fromList
@@ -157,7 +157,6 @@ identifierSymbols = [
  ]
 
 
-
 identifierToken : Parser Token
 identifierToken = do
   first <- satisfy (\c => isAlpha c || hasAny [c] identifierSymbols)
@@ -167,9 +166,9 @@ identifierToken = do
 mutual
   anyLiteral : Parser Token
   anyLiteral = stringLiteralToken
-    <|> charLiteralToken
-    <|> identifierToken
-    <|> intLiteralToken
+    <|>| charLiteralToken
+    <|>| identifierToken
+    <|>| intLiteralToken
     <|>| listLiteralToken
     <|>| tupleLiteral
 
@@ -194,9 +193,18 @@ tokensToString xs = concat $ map show xs
 
 printFile : Show Token => Either FileError String -> IO ()
 printFile (Left l) = printLn (show l)
-printFile (Right r) = printLn $ map tokensToString (parse tokenParser r)
+printFile (Right r) = case map tokensToString (parse tokenParser r) of
+    (Left l) => putStrLn (show l)
+    (Right r) => putStrLn r
 
 main : IO ()
 main = do
   maybeFileHandle <- readFile "IdrisFMT.idr"
-  printFile @{pretty} maybeFileHandle
+  printFile @{default} maybeFileHandle
+
+main2 : IO ()
+main2 = putStrLn $ str
+    where
+      str = case parse tokenParser "\"IdrisFMT.idr\" \n" of
+                 (Left l) => "failed" ++ show l
+                 (Right r) => show $ map (show @{default}) r
