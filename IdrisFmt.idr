@@ -205,6 +205,6 @@ main = do
 main2 : IO ()
 main2 = putStrLn $ str
     where
-      str = case parse tokenParser "\"IdrisFMT.idr\" \n" of
+      str = case parse (many $ stringLiteralToken <|> whiteSpaceToken) "\"IdrisFMT.idr\" \n" of
                  (Left l) => "failed" ++ show l
                  (Right r) => show $ map (show @{default}) r
