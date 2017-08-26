@@ -52,7 +52,7 @@ data Token =
   show (StringLiteral s)  = "\"" ++ s ++ "\""
   show (CharLiteral s)    = "'" ++ s ++ "'"
   show (ListLiteral xs)   = show xs
-  show (TupleLiteral xs)  = show "(" ++ show xs ++ ")"
+  show (TupleLiteral xs)  = "(" ++ unwords (intersperse "," (map show xs)) ++ ")"
   show (IntegerLiteral i) = show i
 
 [default] Show Token where
@@ -75,8 +75,8 @@ data Token =
   show RightParen         = ")"
   show (StringLiteral s)  = "StringLiteral(\"" ++ s ++ "\")"
   show (CharLiteral s)    = "'" ++ s ++ "'"
-  show (ListLiteral xs)   = show xs
-  show (TupleLiteral xs)  = show "(" ++ show xs ++ ")"
+  show (ListLiteral xs)   = unwords $ map show xs
+  show (TupleLiteral xs)  = "(" ++ unwords (intersperse "," (map show xs)) ++ ")"
   show (IntegerLiteral i) = show i
 
 escape : Parser String
@@ -92,10 +92,10 @@ character : Parser String
 character = nonEscape <|>| escape
 
 stringLiteralToken : Parser Token
-stringLiteralToken = map (StringLiteral . concat) $ dquote (many character)
+stringLiteralToken = map (StringLiteral . concat) $ (between (char '"') (char '"')) (many character)
 
 charLiteralToken : Parser Token
-charLiteralToken = map CharLiteral $ squote character
+charLiteralToken = map CharLiteral $ squote (character <|> (map singleton $ char '"'))
 
 intLiteralToken : Parser Token
 intLiteralToken = map IntegerLiteral integer
@@ -200,11 +200,11 @@ printFile (Right r) = case map tokensToString (parse tokenParser r) of
 main : IO ()
 main = do
   maybeFileHandle <- readFile "IdrisFMT.idr"
-  printFile @{default} maybeFileHandle
+  printFile @{pretty} maybeFileHandle
 
 main2 : IO ()
 main2 = putStrLn $ str
     where
-      str = case parse (many $ stringLiteralToken <|> whiteSpaceToken) "\"IdrisFMT.idr\" \n" of
+      str = case parse tokenParser "'\"' \n" of
                  (Left l) => "failed" ++ show l
                  (Right r) => show $ map (show @{default}) r
