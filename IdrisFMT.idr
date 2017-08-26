@@ -25,6 +25,8 @@ data Token =
   | Equality
   | LeftParen
   | RightParen
+  | LeftBrace
+  | RightBrace
   | StringLiteral String
   | CharLiteral String
   | ListLiteral (List Token)
@@ -49,9 +51,11 @@ data Token =
   show Equality           = "="
   show LeftParen          = "("
   show RightParen         = ")"
+  show LeftBrace          = "{"
+  show RightBrace         = "}"
   show (StringLiteral s)  = "\"" ++ s ++ "\""
   show (CharLiteral s)    = "'" ++ s ++ "'"
-  show (ListLiteral xs)   = show xs
+  show (ListLiteral xs)   = "[" ++  foldl (++) "" (map show xs) ++ "]"
   show (TupleLiteral xs)  = "(" ++ unwords (intersperse "," (map show xs)) ++ ")"
   show (IntegerLiteral i) = show i
 
@@ -61,18 +65,20 @@ data Token =
   show Where              = "where"
   show (Identifier x)     = "Identifier(" ++ x ++ ")"
   show Dollar             = "$"
-  show Comma              = ","
+  show Comma              = "(,)"
   show Period             = "."
   show Colon              = ":"
   show LeftArrow          = "<-"
   show RightArrow         = "->"
   show BigRightArrow      = "=>"
-  show (WhiteSpace c)     = show c
+  show (WhiteSpace c)     = "(" ++ show c ++ ")"
   show Newline            = "(newline)"
   show Pipe               = "|"
   show Equality           = "="
   show LeftParen          = "("
   show RightParen         = ")"
+  show LeftBrace          = "{"
+  show RightBrace         = "}"
   show (StringLiteral s)  = "StringLiteral(\"" ++ s ++ "\")"
   show (CharLiteral s)    = "'" ++ s ++ "'"
   show (ListLiteral xs)   = unwords $ map show xs
@@ -116,7 +122,9 @@ keyWordMap = fromList
     ("|", Pipe),
     ("=", Equality),
     ("(", LeftParen),
-    (")", RightParen)
+    (")", RightParen),
+    ("{", LeftBrace),
+    ("}", RightBrace)
   ]
 
 emptyParser : ParserT String Identity String
@@ -163,6 +171,9 @@ identifierToken = do
   rest  <- many (satisfy (\c => isAlpha c || isDigit c || hasAny [c] identifierSymbols))
   pure $ Identifier $ (pack $ first :: rest)
 
+whiteSpaceToken : Parser Token
+whiteSpaceToken = map WhiteSpace space
+
 mutual
   anyLiteral : Parser Token
   anyLiteral = stringLiteralToken
@@ -176,10 +187,7 @@ mutual
   tupleLiteral = parens $ map TupleLiteral $ commaSep anyLiteral
 
   listLiteralToken : Parser Token
-  listLiteralToken = brackets $ map ListLiteral $ commaSep anyLiteral
-
-whiteSpaceToken : Parser Token
-whiteSpaceToken = map WhiteSpace space
+  listLiteralToken = between (char '[') (char ']') $ map ListLiteral $ many ( anyLiteral <|>| whiteSpaceToken <|>| keyWordToken)
 
 tokenParser : Parser (List Token)
 tokenParser = many (
@@ -205,6 +213,6 @@ main = do
 main2 : IO ()
 main2 = putStrLn $ str
     where
-      str = case parse tokenParser "'\"' \n" of
+      str = case parse tokenParser "['a', 'b',  'd']' \n" of
                  (Left l) => "failed" ++ show l
-                 (Right r) => show $ map (show @{default}) r
+                 (Right r) => show $ map (show @{pretty}) r
