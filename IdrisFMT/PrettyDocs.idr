@@ -55,8 +55,8 @@ record DataDefinition where
     header, body : List Token
 
 dataDef : List Token -> DataDefinition
-dataDef xs = case List.span (not . isEquality) xs of
-  (before, after) => MkDataDefinition (before ++ [Equality]) (drop 1 after)
+dataDef xs = case List.span (not . isPipe) xs of
+  (before, after) => MkDataDefinition before (drop 1 after)
 
 tokenToDoc : Token -> Doc
 tokenToDoc (WhiteSpace '\n') = empty
@@ -66,12 +66,11 @@ tokensToDoc : List Token -> Doc
 tokensToDoc xs = foldl (|+|) empty $ map tokenToDoc xs
 
 bodyToDoc : List Token -> Doc
-bodyToDoc tokens = fillCat $ map tokensToDoc $ case (List.split isPipe tokens) of
-  (head :: tail) => head :: map (\xs => Pipe :: xs) tail
+bodyToDoc tokens = fillCat $ map tokensToDoc $ map (\xs => Pipe :: xs) (List.split isPipe tokens)
 
 dataDefToDoc : DataDefinition -> Doc
 dataDefToDoc (MkDataDefinition header body) =
-  (tokensToDoc header) |//| nest 4 (line |+| (bodyToDoc body))
+  (tokensToDoc header) |+| (group $ nest 4 (line |+| (bodyToDoc body)))
 
 prettyTokensStr : List Token -> String
 prettyTokensStr tokens = foldl (++) "" $ map (show @{pretty}) tokens
