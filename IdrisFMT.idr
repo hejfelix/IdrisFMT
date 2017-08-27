@@ -7,7 +7,7 @@ import Lightyear.Char
 
 import Data.SortedMap
 
-export
+public export
 data Token =
   Import
   | Module
