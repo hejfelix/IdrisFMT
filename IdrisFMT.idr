@@ -7,6 +7,7 @@ import Lightyear.Char
 
 import Data.SortedMap
 
+export
 data Token =
   Import
   | Module
@@ -35,7 +36,7 @@ data Token =
   | TupleLiteral (List Token)
   | IntegerLiteral Integer
 
-
+export
 [pretty] Show Token where
   show Module             = "module"
   show Import             = "import"
@@ -63,6 +64,7 @@ data Token =
   show (TupleLiteral xs)  = "(" ++ foldl (++) "" (map show xs) ++ ")"
   show (IntegerLiteral i) = show i
 
+export
 [default] Show Token where
   show Module             = "module"
   show Import             = "import"
@@ -90,6 +92,8 @@ data Token =
   show (ListLiteral xs)   = unwords $ map show xs
   show (TupleLiteral xs)  = "(" ++ unwords (intersperse "," (map show xs)) ++ ")"
   show (IntegerLiteral i) = show i
+
+
 
 escape : Parser String
 escape = do
@@ -189,6 +193,7 @@ anyLiteral = stringLiteralToken
   <|>| intLiteralToken
   <|>| stringLiteralToken
 
+export
 tokenParser : Parser (List Token)
 tokenParser = many (
   keyWordToken      <|>

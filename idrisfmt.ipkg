@@ -1,6 +1,6 @@
 package idrisfmt
 
-modules = IdrisFMT
+modules = IdrisFMT, PrettyDocs
 executable = yourExecutable
 main = main
 
