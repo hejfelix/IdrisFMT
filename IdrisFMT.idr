@@ -210,15 +210,21 @@ printFile (Right r) = case map tokensToString (parse tokenParser r) of
     (Left l) => putStrLn (show l)
     (Right r) => putStrLn r
 
-main : IO ()
-main = do
-  _ <- putStrLn "Now parsing file..."
-  maybeFileHandle <- readFile "IdrisFMT.idr"
-  printFile @{pretty} maybeFileHandle
+tokenize : String -> List Token
+tokenize str = case parse tokenParser str of
+  (Left l) => [Identifier("TOKNIZER-ERROR" ++ l)]
+  (Right r) => r
 
-main2 : IO ()
-main2 = putStrLn $ str
-    where
-      str = case parse tokenParser "[(\"hejabe\",  Abekat)]" of
-                 (Left l) => "failed" ++ show l
-                 (Right r) => show $ map (show @{pretty}) r
+
+-- main : IO ()
+-- main = do
+--   _ <- putStrLn "Now parsing file..."
+--   maybeFileHandle <- readFile "IdrisFMT.idr"
+--   printFile @{pretty} maybeFileHandle
+--
+-- main2 : IO ()
+-- main2 = putStrLn $ str
+--     where
+--       str = case parse tokenParser "[(\"hejabe\",  Abekat)]" of
+--                  (Left l) => "failed" ++ show l
+--                  (Right r) => show $ map (show @{pretty}) r
