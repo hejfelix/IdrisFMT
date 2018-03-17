@@ -1,10 +1,6 @@
 module IdrisFMT
 
-import Lightyear
-import Lightyear.Core
-import Lightyear.Strings
-import Lightyear.Char
-
+import Text.Lexer
 import Data.SortedMap
 
 public export
@@ -17,7 +13,7 @@ data Token =
   | Colon
   | Comma
   | Dollar
-  | WhiteSpace Char
+  | WhiteSpace String
   | Newline
   | LeftArrow
   | RightArrow
@@ -34,38 +30,51 @@ data Token =
   | CharLiteral String
   | ListLiteral (List Token)
   | TupleLiteral (List Token)
-  | IntegerLiteral Integer
+  | IntegerLiteral String
+  | UnknownToken String
+  | Comment String
+
+-- export
+-- [pretty] Show Token where
+--   show Module             = "module"
+--   show Import             = "import"
+--   show Where              = "where"
+--   show (Identifier x)     = x
+--   show Dollar             = "$"
+--   show Comma              = ","
+--   show Period             = "."
+--   show Colon              = ":"
+--   show LeftArrow          = "<-"
+--   show RightArrow         = "->"
+--   show BigRightArrow      = "=>"
+--   show (WhiteSpace c)     = the String $ cast c
+--   show Pipe               = "|"
+--   show Equality           = "="
+--   show LeftParen          = "("
+--   show RightParen         = ")"
+--   show LeftBrace          = "{"
+--   show RightBrace         = "}"
+--   show LeftBracket        = "["
+--   show RightBracket       = "]"
+--   show (StringLiteral s)  = "\"" ++ s ++ "\""
+--   show (CharLiteral s)    = "'" ++ s ++ "'"
+--   show (ListLiteral xs)   = "[" ++ foldl (++) "" (map show xs) ++ "]"
+--   show (TupleLiteral xs)  = "(" ++ foldl (++) "" (map show xs) ++ ")"
+--   show (IntegerLiteral i) = show i
+--   show (UnknownToken s)   = s
+
+Show a => Show (TokenData a) where
+  show (MkToken line col tok) =
+    "(" ++ (show line)
+      ++ ", "
+      ++ (show col)
+      ++ ": "
+      ++ (show tok) ++ ")"
+
+
 
 export
-[pretty] Show Token where
-  show Module             = "module"
-  show Import             = "import"
-  show Where              = "where"
-  show (Identifier x)     = x
-  show Dollar             = "$"
-  show Comma              = ","
-  show Period             = "."
-  show Colon              = ":"
-  show LeftArrow          = "<-"
-  show RightArrow         = "->"
-  show BigRightArrow      = "=>"
-  show (WhiteSpace c)     = the String $ cast c
-  show Pipe               = "|"
-  show Equality           = "="
-  show LeftParen          = "("
-  show RightParen         = ")"
-  show LeftBrace          = "{"
-  show RightBrace         = "}"
-  show LeftBracket        = "["
-  show RightBracket       = "]"
-  show (StringLiteral s)  = "\"" ++ s ++ "\""
-  show (CharLiteral s)    = "'" ++ s ++ "'"
-  show (ListLiteral xs)   = "[" ++ foldl (++) "" (map show xs) ++ "]"
-  show (TupleLiteral xs)  = "(" ++ foldl (++) "" (map show xs) ++ ")"
-  show (IntegerLiteral i) = show i
-
-export
-[default] Show Token where
+Show Token where
   show Module             = "module"
   show Import             = "import"
   show Where              = "where"
@@ -77,7 +86,7 @@ export
   show LeftArrow          = "<-"
   show RightArrow         = "->"
   show BigRightArrow      = "=>"
-  show (WhiteSpace c)     = "(" ++ show c ++ ")"
+  show (WhiteSpace s)     = "(" ++ s ++ ")"
   show Newline            = "(newline)"
   show Pipe               = "|"
   show Equality           = "="
@@ -91,66 +100,45 @@ export
   show (CharLiteral s)    = "'" ++ s ++ "'"
   show (ListLiteral xs)   = unwords $ map show xs
   show (TupleLiteral xs)  = "(" ++ unwords (intersperse "," (map show xs)) ++ ")"
-  show (IntegerLiteral i) = show i
+  show (IntegerLiteral s) = s
+  show (UnknownToken s)   = "UnknownToken: " ++ show s
+  show (Comment s)        = s
 
-
-
-escape : Parser String
-escape = do
-  d <- char '\\'
-  c <- oneOf "\\\"0nrvtbf'"
-  pure $ pack $ (the $ List Char) [d,c]
-
-nonEscape : Parser String
-nonEscape = map (\x => pack $ (the $ List _) [x]) $ noneOf "\\\"\0\n\r\v\t\b\f"
-
-character : Parser String
-character = nonEscape <|>| escape
-
-stringLiteralToken : Parser Token
-stringLiteralToken = map (StringLiteral . concat) $ (between (char '"') (char '"')) (many character)
-
-charLiteralToken : Parser Token
-charLiteralToken = map CharLiteral $ (between (char '\'') (char '\'')) (character <|> (map singleton $ char '"'))
-
-intLiteralToken : Parser Token
-intLiteralToken = map IntegerLiteral integer
+keywordTokens : List (String, Token)
+keywordTokens = [
+  ("module", Module),
+  ("import", Import),
+  ("where", Where),
+  ("<-", LeftArrow),
+  ("->", RightArrow),
+  ("=>", BigRightArrow),
+  (".", Period),
+  (",", Comma),
+  (":", Colon),
+  ("$", Dollar),
+  ("|", Pipe),
+  ("=", Equality),
+  ("(", LeftParen),
+  (")", RightParen),
+  ("{", LeftBrace),
+  ("}", RightBrace),
+  ("[", LeftBracket),
+  ("]", RightBracket)
+]
 
 keyWordMap : SortedMap String Token
-keyWordMap = fromList
-  [
-    ("module", Module),
-    ("import", Import),
-    ("where", Where),
-    ("<-", LeftArrow),
-    ("->", RightArrow),
-    ("=>", BigRightArrow),
-    (".", Period),
-    (",", Comma),
-    (":", Colon),
-    ("$", Dollar),
-    ("|", Pipe),
-    ("=", Equality),
-    ("(", LeftParen),
-    (")", RightParen),
-    ("{", LeftBrace),
-    ("}", RightBrace),
-    ("[", LeftBracket),
-    ("]", RightBracket)
-  ]
+keyWordMap = fromList keywordTokens
 
-emptyParser : ParserT String Identity String
-emptyParser = fail "emptyParser"
+keywordLexers : List Lexer
+keywordLexers = map toLexer keywordTokens
+  where
+    toLexer (keyword, _) = exact keyword
 
-keyWordStringParser : Parser String
-keyWordStringParser = foldl (<|>) emptyParser $ map (string . fst) $ SortedMap.toList keyWordMap
+keywordMapper : String -> Token
+keywordMapper tokenString = fromMaybe (UnknownToken tokenString) $ lookup tokenString keyWordMap
 
-keyWordToken : Parser Token
-keyWordToken = do
-  keyWordString <- keyWordStringParser
-  pure (case SortedMap.lookup keyWordString keyWordMap of
-        Nothing => StringLiteral $ "no token for keyword: " ++ keyWordString
-        (Just x) => x)
+keyWordTokenizer : List (Lexer, String -> Token)
+keyWordTokenizer = map (\lexer => (lexer, keywordMapper)) keywordLexers
 
 identifierSymbols : List Char
 identifierSymbols = [
@@ -177,50 +165,49 @@ identifierSymbols = [
  ]
 
 
-identifierToken : Parser Token
-identifierToken = do
-  first <- satisfy (\c => isAlpha c || hasAny [c] identifierSymbols)
-  rest  <- many (satisfy (\c => isAlpha c || isDigit c || hasAny [c] identifierSymbols))
-  pure $ Identifier $ (pack $ first :: rest)
+identifierLexer : Lexer
+identifierLexer = do
+  (pred (\c => isAlpha c || isDigit c || hasAny [c] identifierSymbols))
+    <+> (many $ pred (\c => isAlpha c || isDigit c || hasAny [c] identifierSymbols))
 
-whiteSpaceToken : Parser Token
-whiteSpaceToken = map WhiteSpace space
+identifierTokenizer : (Lexer, String -> Token)
+identifierTokenizer = (identifierLexer, Identifier)
 
-anyLiteral : Parser Token
-anyLiteral = stringLiteralToken
-  <|>| charLiteralToken
-  <|>| identifierToken
-  <|>| intLiteralToken
-  <|>| stringLiteralToken
-
-export
-tokenParser : Parser (List Token)
-tokenParser = many (
-  keyWordToken      <|>
-  identifierToken   <|>
-  whiteSpaceToken   <|>
-  anyLiteral         )
+anyLiteralTokenizer : List (Lexer, String -> Token)
+anyLiteralTokenizer =
+  [
+    (space, WhiteSpace),
+    (stringLit, StringLiteral),
+    (intLit, IntegerLiteral),
+    (charLit, CharLiteral),
+    (lineComment (exact "--"), Comment)
+  ]
 
 tokensToString : (Show Token) => List Token -> String
 tokensToString xs = concat $ map show xs
 
+tokenMap : TokenMap Token
+tokenMap = anyLiteralTokenizer ++ identifierTokenizer :: keyWordTokenizer
+
+doLex : String -> String
+doLex s = case lex tokenMap s of
+  (tokens, line, col, remain) => unlines $ map show tokens
+
 printFile : Show Token => Either FileError String -> IO ()
-printFile (Left l) = printLn (show l)
-printFile (Right r) = case map tokensToString (parse tokenParser r) of
-    (Left l) => putStrLn (show l)
-    (Right r) => putStrLn r
+printFile (Left l) = printLn ("Error reading file" ++ show l)
+printFile (Right r) = do
+  _ <- putStrLn "tokenizing..."
+  _ <- putStrLn $ doLex r
+  putStrLn "finished..."
 
-tokenize : String -> List Token
-tokenize str = case parse tokenParser str of
-  (Left l) => [Identifier("TOKNIZER-ERROR" ++ l)]
-  (Right r) => r
+lineTokenMap : TokenMap Token
+lineTokenMap = [(lineComment (exact "--"), Comment)]
 
-
--- main : IO ()
--- main = do
---   _ <- putStrLn "Now parsing file..."
---   maybeFileHandle <- readFile "IdrisFMT.idr"
---   printFile @{pretty} maybeFileHandle
+main : IO ()
+main = do
+  _ <- putStrLn "Now parsing file..."
+  maybeFileHandle <- readFile "IdrisFMT.idr"
+  printFile maybeFileHandle
 --
 -- main2 : IO ()
 -- main2 = putStrLn $ str
